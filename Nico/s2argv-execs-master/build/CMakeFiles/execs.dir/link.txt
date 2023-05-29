@@ -1,0 +1,1 @@
+/usr/bin/cc -fPIC  -Wall -pedantic -shared -Wl,-soname,libexecs.so.1 -o libexecs.so.1.4.0 CMakeFiles/execs.dir/execs.c.o CMakeFiles/execs.dir/noshell.c.o 

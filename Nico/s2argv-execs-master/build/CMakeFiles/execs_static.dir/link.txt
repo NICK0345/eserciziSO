@@ -1,0 +1,2 @@
+/usr/bin/ar qc libexecs.a CMakeFiles/execs_static.dir/execs.c.o CMakeFiles/execs_static.dir/noshell.c.o
+/usr/bin/ranlib libexecs.a

@@ -1,0 +1,1 @@
+/usr/bin/cc -fPIC  -Wall -pedantic -shared -Wl,-soname,libexecs-embedded.so.1 -o libexecs-embedded.so.1.4.0 CMakeFiles/execs-embedded.dir/execs.c.o 

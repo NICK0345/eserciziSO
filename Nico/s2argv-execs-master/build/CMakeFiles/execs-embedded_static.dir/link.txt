@@ -1,0 +1,2 @@
+/usr/bin/ar qc libexecs-embedded.a CMakeFiles/execs-embedded_static.dir/execs.c.o
+/usr/bin/ranlib libexecs-embedded.a

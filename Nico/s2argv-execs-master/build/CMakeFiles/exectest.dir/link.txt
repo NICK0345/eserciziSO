@@ -1,0 +1,1 @@
+/usr/bin/cc  -Wall -pedantic CMakeFiles/exectest.dir/execstest.c.o -o exectest  -Wl,-rpath,/home/nico/Desktop/pratica/s2argv-execs-master/build libexecs.so.1.4.0 
