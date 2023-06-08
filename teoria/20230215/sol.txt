@@ -1,0 +1,233 @@
+Esercizio c.1: Scrivere il monitor redblack che fornisce una procedure entry:
+
+I processi che usano il monitor redblack devono sincronizzarsi in modo che completino l'esecuzione di rb in modo alternato: se l'ultimo processo che ha completato rb aveva indicato il colore rosso il prossimo sia nero e viceversa.
+(in altre parole mai due processi che avevano chiamato rb con lo stesso colore possono proseguire uno dopo l'altro)
+Il valore di ritorno di rb deve essere la media dei valori dei parametri "value" delle chiamate rb di colore "color" che sono state sbloccate.
+Esempio: La chiamata rb(red, 2) non si blocca e ritorna 2, successivamente rb(red, 4) si blocca perché l'ultima sbloccata è rossa. Poi rb(black, 5) non si blocca perché l'ultima è rossa e ritorna 5 ma a questo punto si può sbloccare
+anche la chiamata precedente rb(red, 4) e il valore ritornato è 3 (la media fra 2 e 4). 
+
+// 2 dello stesso colore si blocca, e non si blocca se si chiama con colore diverso, se chiamo un colore diverso posso liberare uno che sta con il colore precedente
+
+devo ricordare il colore precedente e comunque nello stesso tempo solo 1 colore sara' bloccato
+
+rosso nero 
+
+rosso nero
+
+
+#define red 0
+#define black 1
+#define default -1
+double rb(int color, double value)
+
+monitor rb{
+    int last_color
+    condition red_ready
+    condition black_ready
+    double red_val
+    double black_val
+    int red_nProc
+    int black_nProc
+
+    rb{
+        last_color = default
+        ready2go = new condition
+        red_val = 0
+        black_val = 0
+        red_nProc = 0 
+        black_nProc = 0
+    }
+
+    double rb(int color, double value){
+        if last_color == color:
+            color == red? red_ready.wait() : black_ready.wait()
+        if color == red:
+            last_color = red
+            red_val += value
+            red_nProc += 1
+            double mid = red_val/red_nProc
+            black_ready.signal()
+        else:
+            last_color = black
+            black_val += value
+            black_nProc += 1
+            double mid = black_val/black_nProc
+            red_ready.signal()
+        return mid
+    }
+}
+
+Esercizio c.2: Dato un servizio di message passing asincrono implementare un servizio di message passing asincrono con contatore che ha tre primitive:
+
+#define ANY (pid_t) 0
+
+void casend(pid_t dest, T msg)
+T carecv(pid_t sender)
+int cacount(pid_t sender)
+
+Le primitive casend/carecv si devono comportare come la asend/arecv. 
+La primitiva cacount deve avere come valore di ritorno il numero di messaggi che risultano in attesa di essere consegnati dal processo mittente indicato come paramentro.
+
+È possibile implementare un meccanismo di message passing completamente asincrono dato il servizio di message passing asincrono con contatore? (sì + come oppure no + perché).
+
+//cacount deve ritornare il numero di messaggi che aspettano di essere consegnati, ma gia' inviati dal processo mittente del parametro (il ricevente non ha fatto carecv)
+
+//solo nel server
+#define ANY (pid_t) 0
+#define send 0
+#define receive 1
+#define count 2
+static hashmap<pid, hashmap<pid, list of <T, int>>> pending
+static time = 0
+
+struct Msg{
+    int type
+    T body
+    pid_t from
+    pid_t to
+}
+
+proc server(){
+    pending = new hashmap
+    while(1){
+        handle_request();
+    }
+}
+
+private Msg get_most_recent(Hashmap map){
+    Msg recent = NULL
+    for(e in map) if (recent == NULL || e.time > recent.time) recent = e
+    map.remove(e)
+    return recent
+}
+
+private Msg get_empty_number(Hashmap map){
+    int n = 0;
+    for(e in map){
+        n += e.list.size()
+    }
+    return n
+}
+
+handle_request(){
+    m = arecv(ANY)
+
+    if(m.type == send){
+        if(pending.get(m.to) == NULL){
+            pending.add(m.to, new hashmap())
+        }
+        if(pending.get(m.to).get(m.from) == NULL) pending.get(m.to).add(m.from, new list())
+        pending.get(m.to).get(m.from).append((m.body, time++))
+    }
+    else if(m.type == receive){
+        if(pending.get(m.to) == NULL || pending.get(m.to).get(m.from) == NULL) asend(m, server) //posticipo la richiesta a me stesso
+        else if (m.from == ANY) asend(get_most_recent(pending.get(m.to)).m)
+        else {
+            asend(pending.get(m.to).get(m.from).get(0).m, m.to)
+            pending.get(m.to).get(m.from).remove(0)
+        }
+    }
+    else if(m.type == count){
+        asend(get_pending_number(pending.get(m.to)), m.to)
+    }
+}
+
+void casend(pid_t dest, T msg){
+    asend(new Msg(send, msg, getpid(), dest), server)
+}
+
+T carecv(pid_t sender){
+    asend(new Msg(receive, null, sender, getpid()), server)
+    return arecv(server)
+}
+
+int cacount(pid_t sender){
+    asend(<count, null, sender, getpid()>, server)
+    m = arecv(server)
+    return atoi(m.body)
+}
+
+
+// e' possibile implementare il servizio completamente asincrono da quello asincrono ponendo ponendo un processo con un database, e ogni processo che vuole ricevere un messaggio deve sapere il numero di server disponibili, senza usare la arecv, se il server non e' disponibile ritorna null, altrimenti il server vede nel buffer che ha ricevuto se ci sono messaggi mandati dal sender al receiver, se si' lo ritorna, altrimenti ritorna null
+
+handle_request(){
+    m = arecv(ANY)
+
+    if(m.type == send){
+        if(pending.get(m.to) == NULL){
+            pending.add(m.to, new hashmap())
+        }
+        if(pending.get(m.to).get(m.from) == NULL) pending.get(m.to).add(m.from, new list())
+        pending.get(m.to).get(m.from).append((m.body, time++))
+    }
+    else if(m.type == receive){
+        if(pending.get(m.to) == NULL || pending.get(m.to).get(m.from) == NULL) asend(null, m.to)
+        else if (m.from == ANY) asend(get_most_recent(pending.get(m.to)).m)
+        else {
+            asend(pending.get(m.to).get(m.from).get(0).m, m.to)
+            pending.get(m.to).get(m.from).remove(0)
+        }
+    }
+    else if(m.type == count){
+        asend(get_pending_number(pending.get(m.to)), m.to)
+    }
+}
+
+Esercizio g.1: Esercizio g.1: Sia dato un sistema monoprocessore con una unita' di I/O. La CPU viene gestita tramite uno
+scheduler preemptive a priorita' statica. L'accesso all'unita' di I/O avviene con politica FIFO.
+Esistono nel sistema tre tipi di processi periodici (che vengono riattivati allo scadere di ogni periodo).
+Trovare per quali valori di x e' possibile calcolare uno schedule di durata infinita (o meglio indefinita) anche e produrre
+il diagramma di Gannt della soluzione con il minimo valore di x. Spiegare il procedimento seguito per trovare la soluzione. 
+(non è detto che i processi inizino il primo periodo al tempo zero).
+
+se non e' detto il tempo di inzio 
+dobbiamo vedere come permuta l'esecuzione del programma in base al tempo di inizio
+
+P1: priorita' massima. 2ms CPU, 2ms I/O, periodo=4ms
+P2: priorita' media: 2ms CPU, 2ms I/O, periodo=8ms
+P3: priorita' minima: 4ms CPU, 2ms I/O, 4ms CPU, 2ms I/O, periodo=x
+
+CPU
+00000000001111111111222222222233333333334444
+01234567890123456789012345678901234567890123
+xx  xx  xx  xx  xx  xx  xx  xx  xx  xx  xx
+  yy      yy      yy      yy      yy      yy
+      zz      zz      zz      zz
+
+xxyyxxzzxxyyxxzzxxyyxxzzxxyyxxzzxx  |
+
+per x >= 36 si'
+
+vediamo per x >= 35, 34...
+
+IO
+000000000011111111112222222222333333333344444
+012345678901234567890123456789012345678901234
+  xx  xx  xx  xx  xx  xx  xx  xx  xx  xx  xx
+    yy      yy      yy      yy      yy
+                zz              zz
+
+almeno 34 ms, sicuramente 40ms
+
+
+xxxx
+-yyyy
+
+quando non coincidono x e y, c'e' di nuovo una delle situazioni di prima, la fetta del tempo non varia perche' se shifto a destra, alla fine del periodo ricevo la fetta del tempo di quello che era stato shiftato
+
+-> se e' possibile farlo con tutti tempo 0 allora e' possibile per qualsiasi tempo di partenza
+
+Esercizio g.2: rispondere alle seguenti domande (motivando opportunamente le risposte!):
+a) Quali operazioni compie un device driver per iniziare una operazione di I/O? Come viene rilevato il completamento dell'operazione di I/O?
+un device driver per inizializzare un'operazione di I/O deve istruire il controller, a quale indirizzo in memoria effettuare l'operazione I/O, indicando anche quali sono le operazioni (scrittura/lettura dati/seek).
+il completamente dell'operazione di I/O viene rilevato grazie a un interrupt bus, che manda un segnale al processore per indicare la terminazione dell'operazione I/O, la CPU dopo un ciclo FDE, controlla se ci sono interrupt mandati dalle periferiche I/O, manda un ack al dispositivo che sta inviando l'interrupt e gestisce l'interrupt
+b) In un sistema a memoria virtuale un interrupt di tipo TLB-miss indica sempre la mancanza di una pagina in memoria (page miss)?
+no, perche' la TLB e' solo una cache delle pagine virtuali presenti in memoria primaria, quindi risulta essere piu' piccola rispetto alla page table in memoria principale, quindi un TLB-miss indica solo che nella TLB non e' presente la pagina richiesta, ma la richiesta puo' essere contenuta nella page table
+c) Quali sono le metodologie che si possono utilizzare per minimizzare i rischi di attacco tramite worm?
+per minimizzare i rischi di attacco worm, possiamo aggiornare i firmware dei software per evitare che ci siano falli dei programmi che possono sfruttati dai worm, configurare propriamente i firewall, nascondere gli utenti della macchina etc...
+d) Confrontare l'allocazione concatenata e l'allocazione indicizzata nei file system. Quali sono i pro e i contro dei due metodi?
+pro allocazione concatenata: e' possibile estendere con facilita' i file
+contro: c'e' overhead dei puntatori nei vari blocchi dati, e' difficile calcolare la posizione del dato in un blocco per la presenza di overhead, molti accessi in memoria secondaria e tempo di seek(lineare) per arrivare a una posizione qualsiasi (accesso lineare ai file), possibile usare cluster, ma puo' causare problemi di frammentazione
+
+pro: allocazione indicizzata: e' possibile estendere i file con facilita' come in allocazione concatenata
+contro: possiamo usare blocchi dati per contenere solo i puntatori ad altri puntatori, in questo modo si riduce il numero di accessi in memoria secondaria, usata dai sistemi di tipo unix (ext2, ext3, ext4), buon compromesso tra estensionalita' del file e numero di seek del disco

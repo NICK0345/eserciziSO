@@ -1,0 +1,139 @@
+Esercizio c.1: Scrivere il monitor synmsg che consenta uno scambio di messaggi fra due processi in maniera sincrona.
+Il processo produttore esegue il seguente codice.
+producer: process:
+    while True:
+        msg_t msg = produce_new_msg()
+        synmsg.send(&msg)
+e il processo consumatore: 
+consumer: process:
+    while True:
+        msg_t msg
+        synmsg.recv(&msg)
+        consume_msg(&msg)
+Come si vede le procedure entry hanno come parametro l'indirizzo del messaggio:
+procedure entry void send(msg_t *msg)
+procedure entry void recv(msg_t *msg)
+Il monitor deve trasferire il contenuto del messaggio direttamente fra i processi usando la funzione:
+void copymsg(msg_t *src, msg_t *dest)
+(Il monitor non deve avere buffer di tipo msg_t ma solo variabili di tipo puntatore a msg_t.)
+
+producer: process:
+    while True:
+        msg_t msg = produce_new_msg()
+        synmsg.send(&msg)
+
+consumer: process:
+    while True:
+        msg_t msg
+        synmsg.recv(&msg)
+        consume_msg(&msg)
+
+procedure entry void send(msg_t *msg)
+procedure entry void recv(msg_t *msg)
+
+void copymsg(msg_t *src, msg_t *dest)
+
+monitor synmsg(){
+    msg_t *data
+    condition ok2produce
+    condition ok2consume
+
+    void copymsg(msg_t *src, msg_t *dest){
+        //fare deep copy di src a dest, assumo che msg_t possiede un costruttore che prende in parametro un msg_t message e ne crea la stessa istanza dell'oggetto
+        dest = new smg_t(*src)
+    }
+
+    procedure entry void send(msg_t *msg){
+        if data != null:
+            ok2produce.wait()
+        data = msg
+        ok2consume.signal()
+    }
+
+    procedure entry void recv(msg_t *msg){
+        if data == null:
+            ok2consume.wait()
+        copymsg(data, msg)
+        data = null
+        ok2produce.signal()
+        return msg
+    }   
+}
+
+Esercizio c.2: Facendo uso di semafori scrivere un funzione wait4 che faccia proseguire i processi a blocchi di quattro: il primo processo che chiama la wait4 si deve fermare, così come il secondo e il terzo. 
+Il quarto processo deve far proseguire tutti e quattro i processi. 
+In uguale modo l'ottavo processo che chiama wait4 risveglierà anche il quinto, il sesto e il settimo.
+SI chiede:
+* che l'implementazione non faccia uso di code o di altre strutture dati ma solamente di contatori (e ovviamente semafori)
+* che la soluzione faccia uso del passaggio del testimone per garantire che vengano riattivati i processi corretti e non altri.
+
+semaphore waiting4 = new semaphore(0)
+semaphore mutex = new semaphore(1)
+int nProc = 0
+
+function wait4(){
+    mutex.p()
+    nProc++
+    if (nProc == 4): waiting4.v()
+    else:
+        mutex.v()
+        waiting4.p()
+        nproc--
+        if(nproc == 0): mutex.v()
+        else: waiting4.v()
+}
+
+
+Esercizio g.1: Siano dati due processi in esecuzione in un sistema monoprocessore e gestiti da uno scheduler round-
+robin.
+I due processi sono gli unici nel sistema e usano la stessa unità di I/O gestita in modo FIFO.
+PA: 1ms CPU, 2ms I/O, 1ms CPU, 8ms I/O, 1ms CPU
+PB: 2ms CPU, 1ms I/O, 8ms CPU, 1ms I/O, 1ms CPU
+Quale è il tempo minimo e quale il tempo massimo impiegato dal sistema per completare l’elaborazione dei due
+processi al variare della lunghezza del quanto di tempo e della posizione iniziale dei processi nella ready queue (PA precede PB o viceversa).
+
+PA PB quanto = 1ms
+
+    0123456789012345678901234567890
+CPU ABBABBBBBBBBAB 
+IO   AABAAAAAAAAB
+
+1ms e' il migliore, perche' sia la CPU e IO sono utilizzati al 100% senza spreco
+
+PB PA quanto = 1ms
+    0123456789012345678901234567890
+CPU BAB ABBBBBBBBAB
+IO   BAABAAAAAAAAB 
+
+PA PB quanto = 8ms uguale a 1ms -> e' indifferente il quanto di tempo, perche' se A precede B, allora tutte le sequenze di esecuzioni saranno le stesse rispetto al quanto di tempo = 1ms, perche' A usa la CPU per al massimo 1ms alla volta quindi non usera' mai completamente il suo time slice se time slice > 1
+
+    0123456789012345678901234567890
+CPU ABBABBBBBBBBAB 
+IO   AABAAAAAAAAB
+
+la situazione cambia quando B precede A perche' potremmo avere l'effetto convoglio
+
+PB PA quanto = 8ms
+
+    0123456789012345678901234567890
+CPU BBABBBBBBBBAB       A    
+IO    BAA      BAAAAAAAA
+
+
+tempo pessimo 20 ms con PB, PA, time slice = 8
+tempo ottimo 13ms con PA, PB, qualsiasi time slice >= 1
+
+Esercizio g.2: rispondere alle seguenti domande (motivando opportunamente le risposte!):
+a) Quali sono gli interrupt hardware più frequenti e quali le trap (interrupt software) più frequenti?
+interrupt: interval timer, interrupt di terminazione di operazione I/O, interrupt delle tastiere (SIGINT)
+trap: syscall, page fault, linking dinamico
+b) A cosa serve il Translation Lookahead Buffer?
+la TLB e' una cache locale alla MMU della page table che si trova nella memoria principale, in sostanza la TLB serve per ridurre il numero di accesso alla memoria principale, accelerando la traduzione degli indirizzi logici alla MMU che senza deve accedere ogni volta alla page table per cercare l'offset della pagina, se la MMU e' abilitato con una TLB, allora prima di andare a leggere nella page table, ricerca la pagina richiesta nella TLB, se non la trova allora avviene una TLB miss, e poi va a trovare la tabella delle pagine per cercare l'offset corretto e fa una TLB refill, andando a scrivre sulla TLB la pagina acceduta piu' recentemente
+c) Quali problemi può porre l'implementazione di un Sistema Operativo con il supporto di memoria virtuale e di controller di I/O di tipo DMA?
+se un sistema deve supportare la memoria virtuale, allora deve avere un campo in piu' nella page table, per indicare la validita' della pagina in memoria principale, inoltre deve allocare la swap area nella memoria secondaria e il kernel deve poter fornire i servizi di per caricare e rilasciare le pagine in memoria principale, inoltre e' anche necessario implementare degli algoritmi di rimpiazzamento per decidere la pagina vittima da rilasciare, per ottimizzare il rilascio delle pagine, si puo' associare a ogni frame in memoria un dirty bit, per evitare di dover ricopiare tutto il frame se non e' stato modificato.
+se inoltre il sistema operativo e' dotato di controller di I/O di tipo DMA, il driver del sistema operativo deve allocare un buffer per il controller, e gestire l'accesso del bus condiviso alla memoria principale
+d) Qual è la complessità computazionale dell'algoritmo del banchiere monovaluta e quella del banchiere multivaluta?
+
+l'algoritmo del banchiere monovaluta e' possibile risolvere facendo un'ordinamento delle esigenze dei processi per poter terminare la propria operazione, quindi assumendo n processi, se si applica un algoritmo di sorting in modo non decrescente in base alla valuta, il costo commplessivo e' O(nlogn)
+
+nel caso del banchiere multivaluta, cio' non e' possibile, per controllare se una situazione e' safe o meno, dobbiamo usare un approccio di backtracking, andando a vedere se lo stato e' safe per ogni permutazione di sequenze di processi quindi dati n procesi la complessita' computazionale nel caso pessimo (caso in cui nessuna permutazione sara' safe) sara' O(n!)
